@@ -8,6 +8,7 @@ const port = process.env.PORT || 5001;
 const mongoose = require("mongoose");
 require("dotenv").config();
 const { Admin } = require("./Model/Admin");
+const { BookingCollection} =require("./Model/bookingCollection")
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.kljii.mongodb.net/repairGuru?retryWrites=true&w=majority`;
 app.use(cors());
 app.use(bodyParser.json());
@@ -57,27 +58,38 @@ app.post("/admin/login", (req, res) => {
     });
 });
 
-
+app.post("/addBooking", (req, res) => {
+  var bookingCollection = new BookingCollection({
+    name: req.body.name,
+    email: req.body.email,
+    problem: req.body.problem,
+    payWith: req.body.payWith,
+    status: req.body.status,
+   
+  }).save((err, response) => {
+    if (err) res.status(201).send(err);
+    res.status(201).send(response);
+  });
+});
+app.get("/bookingListDetails", function (req, res) {
+  BookingCollection.find(function (err, data) {
+      if (err) {
+        console.log(err);
+      } else {
+        res.send(data);
+      }
+    });
+  });
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
 
 client.connect((err) => {
-  const bookingCollection = client.db("repairGuru").collection("bookInfo");
+   const bookingInfoCollection = client.db("repairGuru").collection("bookingcollections");
   const reviewCollection = client.db("repairGuru").collection("userReview");
   const serviceCollection = client.db("repairGuru").collection("services");
-  const adminCollection = client.db("repairGuru").collection("adminUser");
 
-  // perform actions on the collection object
-  app.post("/bookInfo", (req, res) => {
-    const bookInfo = req.body;
-    bookingCollection.insertOne(bookInfo).then((result) => {
-      console.log("inserted count", result.insertedCount);
-      res.send(result.insertedCount > 0);
-      console.log(result);
-    });
-  });
   app.post("/userReview", (req, res) => {
     const userReview = req.body;
     reviewCollection.insertOne(userReview).then((result) => {
@@ -100,46 +112,43 @@ client.connect((err) => {
       console.log(result);
     });
   });
-  app.post("/adminUser", (req, res) => {
-    const adminUser = req.body;
-    adminCollection.insertOne(adminUser).then((result) => {
-      console.log("inserted count", result.insertedCount);
-      res.send(result.insertedCount > 0);
-      console.log(result);
-    });
-  });
-
-  app.get("/bookingListDetails", (req, res) => {
-    bookingCollection.find().toArray((err, items) => {
-      res.send(items);
-    });
-  });
-
+ 
   app.post("/bookingList", (req, res) => {
     const email = req.body.email;
-    bookingCollection.find({ email: email });
+    bookingInfoCollection.find({ email: email });
     const filter = { email: email };
-    bookingCollection.find(filter).toArray((err, documents) => {
+    bookingInfoCollection.find(filter).toArray((err, documents) => {
       res.send(documents);
     });
   });
-  app.post("/isAdmin", (req, res) => {
-    const email = req.body.email;
-    adminCollection.find({ email: email }).toArray((err, admins) => {
-      res.send(admins.length > 0);
-    });
-  });
-  app.patch("/updateStatus/:id", (req, res) => {
-    console.log(req);
-    const id = ObjectID(req.params.id);
-    console.log("update this", id);
-    bookingCollection.updateOne({ _id: id }),
-      {
-        $set: { Status: req.body.status },
-      }.then((err, result) => {
-        console.log(result);
-      });
-  });
+  app.put("/statusUpdate/:id",(req, res)=>{
+    var response = {};
+
+        BookingCollection.findById(req.params.id,function(err,data){
+            if(err) {
+                response = {"error" : true,"message" : "Error fetching data"};
+            } else {
+      
+                if(req.body.status !== undefined) {
+                
+                    data.status = req.body.status;
+                }
+               
+                // save the data
+                data.save(function(err){
+                    if(err) {
+                        response = {"error" : true,"message" : "Error updating data"};
+                    } else {
+                        response = {"error" : false,"message" : "Data is updated for "+req.params.id};
+                    }
+                    res.json(response);
+                })
+            }
+        });
+})
+
+ 
+  
 
   app.get("/servicesList", (req, res) => {
     serviceCollection.find().toArray((err, items) => {
