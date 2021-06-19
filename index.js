@@ -5,20 +5,64 @@ const bodyParser = require("body-parser");
 const ObjectID = require("mongodb").ObjectID;
 const MongoClient = require("mongodb").MongoClient;
 const port = process.env.PORT || 5001;
+const mongoose = require("mongoose");
 require("dotenv").config();
-
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.kljii.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
+const { Admin } = require("./Model/Admin");
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.kljii.mongodb.net/repairGuru?retryWrites=true&w=majority`;
 app.use(cors());
 app.use(bodyParser.json());
 
+mongoose
+  .connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("DB connected!"))
+  .catch((error) => console.log(error));
+
+
+
+app.use(bodyParser.json());
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
+
+app.post("/admin/register", (req, res) => {
+  const admin = new Admin({
+    email: req.body.email,
+    password: req.body.password,
+  }).save((err, response) => {
+    if (err) res.status(400).send(err);
+    res.status(200).send(response);
+  });
+});
+
+app.post("/admin/login", (req, res) => {
+  Admin.findOne({ email: req.body.email })
+    .then((admin) => {
+      if (!admin) res.status(202).json({ message: "invalid credentials" });
+      else {
+        admin.comparePassword(
+          req.body.password,
+
+          (err, isMatch) => {
+            if (err) return console.log(err);
+            else if (!isMatch) {
+              return res.status(202).json({ message: "Invalid credentials" });
+            } else res.status(201).json({ message: "success login" });
+          }
+        );
+      }
+    })
+
+    .catch((error) => {
+      res.status(500).json(error);
+    });
+});
+
 
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
+
 client.connect((err) => {
   const bookingCollection = client.db("repairGuru").collection("bookInfo");
   const reviewCollection = client.db("repairGuru").collection("userReview");
